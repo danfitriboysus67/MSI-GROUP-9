@@ -1,0 +1,26 @@
+const int potPin = A0; 
+const int ledPin = 8;  
+int potValue = 0;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  // Read potentiometer and send to Python
+  potValue = analogRead(potPin);
+  Serial.println(potValue);
+  
+  // Listen for Python's instructions to toggle the LED
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    if (command == '1') {
+      digitalWrite(ledPin, HIGH); // Turn LED ON
+    } else if (command == '0') {
+      digitalWrite(ledPin, LOW);  // Turn LED OFF
+    }
+  }
+  
+  delay(100); 
+}

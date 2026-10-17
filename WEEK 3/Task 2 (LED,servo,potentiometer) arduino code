@@ -1,0 +1,47 @@
+#include <Servo.h>
+
+Servo myservo;
+const int potPin = A0;
+const int ledPin = 8;
+bool isHalted = false; // Tracks if the servo should be paused
+int lastAngle = 0;     // Tracks the last angle for deadband logic
+
+void setup() {
+  Serial.begin(9600);
+  myservo.attach(9);
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  // 1. Check for incoming commands from Python
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    if (cmd == 'h') {
+      isHalted = true;  // Halt servo movement
+    } else if (cmd == 'r') {
+      isHalted = false; // Resume servo movement
+    } else if (cmd == '1') {
+      digitalWrite(ledPin, HIGH); // Turn LED ON
+    } else if (cmd == '0') {
+      digitalWrite(ledPin, LOW);  // Turn LED OFF
+    }
+  }
+
+  // 2. Read the potentiometer and send data to Python
+  int potValue = analogRead(potPin);
+  Serial.println(potValue);
+
+  // 3. Move the servo ONLY if it is not halted
+  if (!isHalted) {
+    // Convert sensor range to a safe 5-170 angle to prevent stall crashes
+    int angle = map(potValue, 0, 1023, 5, 170); 
+    
+    // DEADBAND LOGIC: Only move if the angle changed by more than 2 degrees
+    if (abs(angle - lastAngle) > 2) {
+      myservo.write(angle);
+      lastAngle = angle; // Save the new position
+    }
+  }
+  
+  delay(100); // Small delay for stable plotting
+}

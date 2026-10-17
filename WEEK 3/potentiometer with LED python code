@@ -1,0 +1,28 @@
+import serial
+import time
+
+# Connect to your active port
+ser = serial.Serial('COM5', 9600)
+time.sleep(2) 
+
+try:
+    print("Reading potentiometer. LED turns ON if value > 511. Press Ctrl+C to stop.")
+    while True:
+        if ser.in_waiting > 0:
+            pot_value_str = ser.readline().decode().strip()
+            
+            if pot_value_str.isdigit():
+                pot_value = int(pot_value_str)
+                print(f"Potentiometer Value: {pot_value}")
+                
+                # Logic: Turn ON if value exceeds the 511 threshold
+                if pot_value > 511:
+                    ser.write(b'1')
+                else:
+                    ser.write(b'0')
+
+except KeyboardInterrupt:
+    pass
+finally:
+    ser.close()
+    print("Serial connection closed.")

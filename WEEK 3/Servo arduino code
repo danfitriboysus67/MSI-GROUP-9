@@ -1,0 +1,21 @@
+#include <Servo.h>
+
+Servo myservo; 
+
+void setup() {
+  Serial.begin(9600); // Start serial communication
+  myservo.attach(9);  // Attaches the servo on digital pin 9
+}
+
+void loop() {
+  // Check if Python has sent data
+  if (Serial.available() > 0) {
+    int pos = Serial.parseInt(); // Read the incoming integer from Python
+    
+    // Ensure the angle is within the safe mechanical range
+    if (pos >= 0 && pos <= 180) {
+      myservo.write(pos); // Tell servo to go to position
+      delay(15);          // Wait 15ms for the servo to reach the position
+    }
+  }
+}

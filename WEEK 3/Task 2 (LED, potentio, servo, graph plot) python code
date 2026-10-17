@@ -1,0 +1,67 @@
+import serial
+import matplotlib.pyplot as plt
+import time
+
+# Connect to your active port
+ser = serial.Serial('COM5', 9600, timeout=0.5)
+time.sleep(2)
+
+# Set up Matplotlib interactive plotting
+plt.ion()
+fig, ax = plt.subplots()
+x_vals, y_vals = [], []
+time_step = 0  # Independent counter for the X-axis so the graph scrolls
+
+# Function to catch keyboard presses while the graph is open
+def on_press(event):
+    if event.key == 'h':
+        ser.write(b'h')
+        print(">>> HALT COMMAND SENT: Servo paused. (Press 'r' to resume)")
+    elif event.key == 'r':
+        ser.write(b'r')
+        print(">>> RESUME COMMAND SENT: Servo active.")
+
+# Connect the keyboard listener to the graph window
+fig.canvas.mpl_connect('key_press_event', on_press)
+
+try:
+    print("Starting real-time plot. Click on the graph window and press 'h' to halt the servo.")
+    while True:
+        if ser.in_waiting > 0:
+            pot_value_str = ser.readline().decode().strip()
+            
+            if pot_value_str.isdigit():
+                pot_value = int(pot_value_str)
+                print(f"Potentiometer Value: {pot_value}")
+                
+                # Turn on LED if pot crosses midway point (511)
+                if pot_value > 511:
+                    ser.write(b'1')
+                else:
+                    ser.write(b'0')
+
+                # Update plotting lists using the independent counter
+                time_step += 1
+                x_vals.append(time_step)
+                y_vals.append(pot_value)
+                
+                # Keep the graph from getting too crowded (show last 50 points)
+                if len(x_vals) > 50:
+                    x_vals = x_vals[-50:]
+                    y_vals = y_vals[-50:]
+                
+                # Refresh the graph
+                ax.clear()
+                ax.plot(x_vals, y_vals, color='blue')
+                ax.set_ylim(0, 1023)
+                ax.set_title("Real-Time Potentiometer Data")
+                ax.set_ylabel("Analog Value (0-1023)")
+                plt.pause(0.01)
+
+except KeyboardInterrupt:
+    pass
+finally:
+    ser.close()
+    plt.ioff()
+    plt.show()
+    print("Serial connection closed.")

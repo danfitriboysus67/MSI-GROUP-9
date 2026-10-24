@@ -1,0 +1,135 @@
+import serial
+import matplotlib.pyplot as plt
+import numpy as np
+from collections import deque
+
+def is_circular_motion(x_data, y_data):
+    """
+    Analyzes an array of X and Y accelerometer data.
+    Returns True if the data represents a circular motion, False otherwise.
+    """
+    if len(x_data) < 10:
+        return False
+        
+    # Find the center (mean) of the X and Y movement
+    x_centered = x_data - np.mean(x_data)
+    y_centered = y_data - np.mean(y_data)
+    
+    # Check Amplitude (Variance)
+    if np.var(x_centered) < 10000 or np.var(y_centered) < 10000: 
+        return False
+        
+    # Check Symmetry
+    std_x = np.std(x_centered)
+    std_y = np.std(y_centered)
+    
+    if std_x == 0 or std_y == 0:
+        return False
+        
+    ratio = std_x / std_y
+    if ratio < 0.5 or ratio > 2.0: 
+        return False
+        
+    # Check Continuous Rotation using 2D Cross Product (x1*y2 - y1*x2)
+    clockwise_turns = 0
+    total_turns = len(x_data) - 1
+    
+    for i in range(total_turns):
+        cross_product = (x_centered[i] * y_centered[i+1]) - (y_centered[i] * x_centered[i+1])
+        if cross_product > 0:
+            clockwise_turns += 1
+            
+    # Tally the clockwise vs. counter-clockwise turns
+    turn_ratio = clockwise_turns / total_turns
+    
+    if turn_ratio > 0.70 or turn_ratio < 0.30:
+        return True
+        
+    return False
+
+def classify_motion(x_data, y_data, z_data, noise_threshold=3000):
+    """Classifies the gesture based on the dominant axis of movement."""
+    
+    if is_circular_motion(x_data, y_data):
+        return "Rotation (Circular) 🔄"
+        
+    std_x = np.std(x_data)
+    std_y = np.std(y_data)
+    std_z = np.std(z_data)
+    
+    max_std = max(std_x, std_y, std_z)
+    
+    if max_std < noise_threshold:
+        return "Idle 🛑"
+        
+    if max_std == std_x:
+        return "Left / Right ↔️"
+    elif max_std == std_y:
+        return "Front / Back ↕️"
+    elif max_std == std_z:
+        return "Up / Down ⬆️⬇️"
+        
+    return "Unknown 🤔"
+
+# Change 'COM4' to match your Arduino port
+ser = serial.Serial('COM4', 9600, timeout=1) 
+
+window_size = 40
+history_x = deque(maxlen=window_size)
+history_y = deque(maxlen=window_size)
+history_z = deque(maxlen=window_size)
+
+plot_x, plot_y = [], []
+
+plt.ion()
+fig, ax = plt.subplots()
+ax.set_xlim(-20000, 20000)
+ax.set_ylim(-20000, 20000)
+line, = ax.plot([], [], 'ro')
+
+print("Motion tracking initiated... Perform a gesture!")
+
+while True:
+    try:
+        data = ser.readline().decode('utf-8', errors='ignore').strip()
+        if data:
+            values = data.split(',')
+            
+            if len(values) == 3: 
+                try:
+                    ax_val = int(values[0])
+                    ay_val = int(values[1])
+                    az_val = int(values[2])
+                    
+                    history_x.append(ax_val)
+                    history_y.append(ay_val)
+                    history_z.append(az_val)
+                    
+                    plot_x.append(ax_val)
+                    plot_y.append(ay_val)
+                    
+                    if len(plot_x) > 100:
+                        plot_x.pop(0)
+                        plot_y.pop(0)
+                        
+                    line.set_data(plot_x, plot_y)
+                    plt.draw()
+                    plt.pause(0.01)
+                    
+                    if len(history_x) == window_size:
+                        motion_type = classify_motion(history_x, history_y, history_z)
+                        
+                        if "Idle" not in motion_type: 
+                            print(f"Motion Detected: {motion_type}")
+                        
+                        history_x.clear()
+                        history_y.clear()
+                        history_z.clear()
+                        
+                except ValueError:
+                    pass 
+    except KeyboardInterrupt:
+        print("\nProgram terminated.")
+        break
+        
+ser.close()
